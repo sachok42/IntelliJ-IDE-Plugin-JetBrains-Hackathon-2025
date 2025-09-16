@@ -11,7 +11,7 @@ class Structure {
         for (name in names) {
             for (line in chunks[name]!!.lines) {
                 for (otherName in names) {
-                    if (line.contains(otherName)) {
+                    if (otherName != name && line.contains(otherName)) {
                         chunks[name]!!.addDependency(otherName)
                     }
                 }
@@ -19,19 +19,19 @@ class Structure {
         }
     }
     fun getChunkPrompt(name: String): String {
-        var res = "chunk is ${chunks[name]!!.getText()}"
+        var res = "chunk is:\n ${chunks[name]!!.getText()}"
         for (dependency in chunks[name]!!.dependencies) {
-            res += "Mentioned concept $dependency:\n" + chunks[dependency]!!.getText()
+            res += "Mentioned concept $dependency:\n" + chunks[dependency]!!.getText() + "\n"
         }
         return res
     }
 }
 
 class Chunk(val start: Int) {
-//    val firstStringIndex = 0
+    //    val firstStringIndex = 0
     var end = 0
     val lines: MutableList<String> = mutableListOf()
-    val dependencies = mutableListOf<String>()
+    val dependencies = HashSet<String>()
     fun addLine(value: String) {
         lines.add(value)
     }
@@ -62,37 +62,36 @@ fun coolStart(line: String): Boolean {
 
 fun parse(lines: List<String>): Structure {
     var res = Structure()
-    val chunks = mutableListOf<Chunk>()
+//    val chunks = mutableListOf<Chunk>()
     var depth = 0
+    var chunk_name: String = ""
     var inside_object = false
 
     lines.forEachIndexed { index, line ->
         if (depth == 0 && inside_object) {
-            chunks[chunks.size - 1].end = index
+            res.chunks[chunk_name]!!.end = index
 
             inside_object = false
         }
         if (depth == 0 && coolStart(line)) { // starting a new chunk
-            res.addChunk(extractName(line)!!, Chunk(index))
+            chunk_name = extractName(line)!!
+            println("new chunk: line ${index + 1}, name $chunk_name")
+            res.addChunk(chunk_name, Chunk(index))
             inside_object = true
-            chunks.add(Chunk(index))
+//            chunks.add(Chunk(index))
         }
-        if (line.contains("{")) {
-            depth++
-        }
-        if (line.contains("}")){
-            depth--
-        }
+        depth += line.count { it == '{' }
+        depth -= line.count { it == '}' }
         if (inside_object) {
-            chunks[chunks.size - 1].addLine(line)
+            res.chunks[chunk_name]!!.addLine(line)
         }
     }
     res.addDependencies()
     return res
 }
 
-fun main() {
-    val lines = File("parse.kts").readLines()
-    val structure = parse(lines)
-    println(structure.getChunkPrompt("main"))
-}
+//fun main() {
+//    val lines = File("src/Main.kt").readLines()
+//    val structure = parse(lines)
+//    println(structure.getChunkPrompt("main"))
+//}
